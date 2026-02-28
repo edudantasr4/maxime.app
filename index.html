@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Maxime – Sistema de Orçamentos</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- HEADER COM LOGO -->
+  <header class="header">
+    <div class="header-container">
+      <div class="logo-section">
+        <div class="logo">✕</div>
+        <div class="logo-text">
+          <h1>MAXIME</h1>
+          <p>NOIVOS E BLACK TIE</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="app">
+    <h1 style="display:none;">SISTEMA MAXIME – CONSULTA</h1>
+
+    <!-- Tela de Login -->
+    <div id="login-view">
+      <h2>Login</h2>
+      <label>
+        Tipo de usuário:
+        <select id="role">
+          <option value="consultor">Consultor</option>
+          <option value="master">Master</option>
+        </select>
+      </label>
+
+      <label>
+        Senha:
+        <input type="password" id="password" />
+      </label>
+
+      <button id="login-btn">Entrar</button>
+      <p id="login-error" class="error"></p>
+    </div>
+
+    <!-- Tela de Consulta -->
+    <div id="consulta-view" style="display:none;">
+      <div class="top-bar">
+        <span id="user-role"></span>
+        <button id="logout-btn">Sair</button>
+      </div>
+
+      <!-- Área do master (dashboard) - Renderizado dinamicamente - TOPO -->
+      <div id="master-dashboard" style="display:none;"></div>
+
+      <h2>Consulta de Orçamentos</h2>
+
+      <label>
+        Nome do noivo:
+        <input type="text" id="search-name" placeholder="Digite o nome do noivo" />
+      </label>
+      <button id="search-btn">Buscar</button>
+
+      <table id="results-table">
+        <thead>
+          <tr>
+            <th>Data/Hora</th>
+            <th>Nome</th>
+            <th>Email</th>
+            <th>WhatsApp</th>
+            <th>Data Casamento</th>
+            <th>Consultor</th>
+            <th>Observações</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal de Observações -->
+  <div id="observacao-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Observações de <span id="observacao-nome"></span></h2>
+        <button id="close-modal-btn" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="observacao-texto"></p>
+      </div>
+      <div class="modal-footer">
+        <button id="close-modal-btn-footer" class="modal-btn-close">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
