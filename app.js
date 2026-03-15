@@ -7,9 +7,9 @@ const EMAILJS_TEMPLATE_ID = "template_maxime_cadastro";
 const MASTER_PASSWORD = "master123";
 const CONSULTOR_PASSWORD = "consultor123";
 const API_URL =
-  "https://script.google.com/macros/s/AKfycbzmDVYt9ALsg9f0c8gaGdep7RVUNFokwbgHbwS6Ki8KSVF1XrcHRCfctPzfvhxNRHKUbw/exec";
+  "https://script.google.com/macros/s/AKfycbxjTbj-AapfLmAAUz-Zi8uUfwVkyK5QN4F9uOuzV7ckApJeXBARumPiQohB4Y_JJLWmQw/exec";
 const UPDATE_STATUS_URL =
-  "https://script.google.com/macros/s/AKfycbzmDVYt9ALsg9f0c8gaGdep7RVUNFokwbgHbwS6Ki8KSVF1XrcHRCfctPzfvhxNRHKUbw/exec";
+  "https://script.google.com/macros/s/AKfycbxjTbj-AapfLmAAUz-Zi8uUfwVkyK5QN4F9uOuzV7ckApJeXBARumPiQohB4Y_JJLWmQw/exec";
 
 // ===== INICIALIZAR EMAILJS =====
 emailjs.init(EMAILJS_PUBLIC_KEY);
