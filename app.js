@@ -10,12 +10,61 @@ const CONSULTOR_PASSWORD = "consultor123";
 // 🔴 URL CORRETA DO APPS SCRIPT
 const API_URL = "https://script.google.com/macros/s/AKfycbwOie7Urlq0LPtw4nmnPnGMC0BXD18ZG_bI1yyIaHAhNHbsdjLRhgdt8Dum3lLz0rmJ0Q/exec";
 const UPDATE_STATUS_URL = "https://script.google.com/macros/s/AKfycbwOie7Urlq0LPtw4nmnPnGMC0BXD18ZG_bI1yyIaHAhNHbsdjLRhgdt8Dum3lLz0rmJ0Q/exec";
+const WORKER_URL = "https://maxime.eduardo-0a6.workers.dev/";
 
 // ===== INICIALIZAR EMAILJS =====
 emailjs.init(EMAILJS_PUBLIC_KEY);
 
 let currentRole = null;
 let allData = [];
+
+console.log("✅ App Maxime inicializado – Conectado à API real");
+
+// ===== INTERCEPTAR FORMULÁRIOS DO WORDPRESS =====
+// Isso monitora quando um formulário é enviado
+window.addEventListener("load", function() {
+  // Procurar por formulários Fluent Forms
+  const forms = document.querySelectorAll("form");
+  forms.forEach(form => {
+    form.addEventListener("submit", async function(e) {
+      // Deixar o formulário ser enviado normalmente
+      // Mas também enviar email
+      setTimeout(() => {
+        console.log("📧 Formulário enviado, tentando enviar email...");
+      }, 500);
+    });
+  });
+
+  // Monitorar mudanças na planilha a cada 5 segundos
+  setInterval(async () => {
+    const lastRowData = await getLastRowFromSheet();
+    if (lastRowData) {
+      console.log("📧 Novo dados detectados, enviando email...");
+      await enviarEmailComEmailJS(
+        lastRowData.email,
+        lastRowData.nome,
+        lastRowData.observacao
+      );
+    }
+  }, 5000);
+});
+
+// ===== BUSCAR ÚLTIMO REGISTRO DA PLANILHA =====
+async function getLastRowFromSheet() {
+  try {
+    const response = await fetch(API_URL);
+    const result = await response.json();
+    const data = result.data || [];
+    
+    if (data.length > 0) {
+      return data[0]; // Primeiro é o mais recente
+    }
+    return null;
+  } catch (error) {
+    console.error("Erro ao buscar último registro:", error);
+    return null;
+  }
+}
 
 // ===== LOGIN =====
 async function handleLogin() {
@@ -58,6 +107,7 @@ async function fetchDataFromAPI() {
     const response = await fetch(API_URL);
     const result = await response.json();
     allData = result.data || [];
+    console.log(`✅ Dados carregados da API: ${allData.length} registros`);
     renderResults();
     if (currentRole === "master") {
       renderMasterDashboard();
@@ -183,19 +233,27 @@ document.addEventListener("DOMContentLoaded", function() {
   };
 
   // Event listeners dos botões
-  document.getElementById("login-btn").onclick = handleLogin;
-  document.getElementById("logout-btn").onclick = handleLogout;
-  document.getElementById("search-btn").onclick = handleSearch;
+  const loginBtn = document.getElementById("login-btn");
+  const logoutBtn = document.getElementById("logout-btn");
+  const searchBtn = document.getElementById("search-btn");
+  const searchInput = document.getElementById("search-name");
+  const passwordInput = document.getElementById("password");
 
-  // Enter para buscar
-  document.getElementById("search-name").addEventListener("keypress", function(e) {
-    if (e.key === "Enter") handleSearch();
-  });
+  if (loginBtn) loginBtn.onclick = handleLogin;
+  if (logoutBtn) logoutBtn.onclick = handleLogout;
+  if (searchBtn) searchBtn.onclick = handleSearch;
+  
+  if (searchInput) {
+    searchInput.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") handleSearch();
+    });
+  }
 
-  // Enter para login
-  document.getElementById("password").addEventListener("keypress", function(e) {
-    if (e.key === "Enter") handleLogin();
-  });
+  if (passwordInput) {
+    passwordInput.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") handleLogin();
+    });
+  }
 });
 
 // ===== UPDATE STATUS =====
@@ -223,6 +281,13 @@ async function updateStatus(nome, novoStatus) {
 // ===== ENVIAR EMAIL COM EMAILJS =====
 async function enviarEmailComEmailJS(email, nome, observacao) {
   try {
+    // Validar se já enviamos email para este nome
+    const sentEmails = JSON.parse(localStorage.getItem("sentEmails") || "[]");
+    if (sentEmails.includes(nome)) {
+      console.log("📧 Email já foi enviado para:", nome);
+      return false;
+    }
+
     console.log("📧 Enviando email para:", email);
 
     const templateParams = {
@@ -238,7 +303,12 @@ async function enviarEmailComEmailJS(email, nome, observacao) {
       templateParams
     );
 
-    console.log("✅ Email enviado com sucesso!", response);
+    console.log("✅✅✅ EMAIL ENVIADO COM SUCESSO!", response);
+    
+    // Marcar que já enviamos email para este nome
+    sentEmails.push(nome);
+    localStorage.setItem("sentEmails", JSON.stringify(sentEmails));
+    
     return true;
   } catch (error) {
     console.error("❌ Erro ao enviar email:", error);
