@@ -10,59 +10,48 @@ const CONSULTOR_PASSWORD = "consultor123";
 // 🔴 URL CORRETA DO APPS SCRIPT
 const API_URL = "https://script.google.com/macros/s/AKfycbwOie7Urlq0LPtw4nmnPnGMC0BXD18ZG_bI1yyIaHAhNHbsdjLRhgdt8Dum3lLz0rmJ0Q/exec";
 const UPDATE_STATUS_URL = "https://script.google.com/macros/s/AKfycbwOie7Urlq0LPtw4nmnPnGMC0BXD18ZG_bI1yyIaHAhNHbsdjLRhgdt8Dum3lLz0rmJ0Q/exec";
-const WORKER_URL = "https://maxime.eduardo-0a6.workers.dev/";
 
 // ===== INICIALIZAR EMAILJS =====
 emailjs.init(EMAILJS_PUBLIC_KEY);
 
 let currentRole = null;
 let allData = [];
+let ultimoRegistroEnviado = null;
+let ultimasDataVerificada = null;
 
 console.log("✅ App Maxime inicializado – Conectado à API real");
 
-// ===== INTERCEPTAR FORMULÁRIOS DO WORDPRESS =====
-// Isso monitora quando um formulário é enviado
-window.addEventListener("load", function() {
-  // Procurar por formulários Fluent Forms
-  const forms = document.querySelectorAll("form");
-  forms.forEach(form => {
-    form.addEventListener("submit", async function(e) {
-      // Deixar o formulário ser enviado normalmente
-      // Mas também enviar email
-      setTimeout(() => {
-        console.log("📧 Formulário enviado, tentando enviar email...");
-      }, 500);
-    });
-  });
+// ===== VERIFICAR NOVOS REGISTROS A CADA 2 SEGUNDOS =====
+setInterval(async () => {
+  await verificarNovoRegistro();
+}, 2000);
 
-  // Monitorar mudanças na planilha a cada 5 segundos
-  setInterval(async () => {
-    const lastRowData = await getLastRowFromSheet();
-    if (lastRowData) {
-      console.log("📧 Novo dados detectados, enviando email...");
-      await enviarEmailComEmailJS(
-        lastRowData.email,
-        lastRowData.nome,
-        lastRowData.observacao
-      );
-    }
-  }, 5000);
-});
-
-// ===== BUSCAR ÚLTIMO REGISTRO DA PLANILHA =====
-async function getLastRowFromSheet() {
+// ===== VERIFICAR SE HÁ NOVO REGISTRO =====
+async function verificarNovoRegistro() {
   try {
     const response = await fetch(API_URL);
     const result = await response.json();
     const data = result.data || [];
-    
-    if (data.length > 0) {
-      return data[0]; // Primeiro é o mais recente
+
+    if (data.length === 0) return;
+
+    const ultimoRegistro = data[0]; // O mais recente está no topo
+    const dataAtual = ultimoRegistro.dataHora ? new Date(ultimoRegistro.dataHora).getTime() : 0;
+
+    // Se é um registro novo (diferente do último verificado)
+    if (ultimasDataVerificada !== dataAtual && ultimoRegistro.email) {
+      console.log("🆕 NOVO REGISTRO DETECTADO:", ultimoRegistro.nome);
+      ultimasDataVerificada = dataAtual;
+
+      // Enviar email imediatamente
+      await enviarEmailComEmailJS(
+        ultimoRegistro.email,
+        ultimoRegistro.nome,
+        ultimoRegistro.observacao
+      );
     }
-    return null;
   } catch (error) {
-    console.error("Erro ao buscar último registro:", error);
-    return null;
+    console.error("Erro ao verificar novo registro:", error);
   }
 }
 
@@ -242,7 +231,7 @@ document.addEventListener("DOMContentLoaded", function() {
   if (loginBtn) loginBtn.onclick = handleLogin;
   if (logoutBtn) logoutBtn.onclick = handleLogout;
   if (searchBtn) searchBtn.onclick = handleSearch;
-  
+
   if (searchInput) {
     searchInput.addEventListener("keypress", function(e) {
       if (e.key === "Enter") handleSearch();
@@ -281,14 +270,12 @@ async function updateStatus(nome, novoStatus) {
 // ===== ENVIAR EMAIL COM EMAILJS =====
 async function enviarEmailComEmailJS(email, nome, observacao) {
   try {
-    // Validar se já enviamos email para este nome
-    const sentEmails = JSON.parse(localStorage.getItem("sentEmails") || "[]");
-    if (sentEmails.includes(nome)) {
-      console.log("📧 Email já foi enviado para:", nome);
+    if (!email || email.trim() === "") {
+      console.log("❌ Email vazio, não enviando");
       return false;
     }
 
-    console.log("📧 Enviando email para:", email);
+    console.log("📧📧📧 ENVIANDO EMAIL PARA:", email);
 
     const templateParams = {
       to_email: email,
@@ -303,15 +290,11 @@ async function enviarEmailComEmailJS(email, nome, observacao) {
       templateParams
     );
 
-    console.log("✅✅✅ EMAIL ENVIADO COM SUCESSO!", response);
-    
-    // Marcar que já enviamos email para este nome
-    sentEmails.push(nome);
-    localStorage.setItem("sentEmails", JSON.stringify(sentEmails));
-    
+    console.log("✅✅✅ EMAIL ENVIADO COM SUCESSO PARA:", email);
+    console.log("Resposta EmailJS:", response);
     return true;
   } catch (error) {
-    console.error("❌ Erro ao enviar email:", error);
+    console.error("❌❌❌ ERRO AO ENVIAR EMAIL:", error);
     return false;
   }
 }
