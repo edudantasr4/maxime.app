@@ -1,4 +1,5 @@
 // ===== CONFIGURAÇÕES EMAILJS =====
+// esperar cloud
 const EMAILJS_PUBLIC_KEY = "IN4Q24MwID8vgdvUw";
 const EMAILJS_SERVICE_ID = "service_xv1618p";
 const EMAILJS_TEMPLATE_ID = "template_maxime_cadastro";
