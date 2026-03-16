@@ -1,312 +1,208 @@
-// ====== CONFIGURAÇÕES BÁSICAS ======
-
-// Senhas simples (trocar depois)
+// ===== CONFIGURAÇÕES BÁSICAS =====
 const MASTER_PASSWORD = "master123";
 const CONSULTOR_PASSWORD = "consultor123";
 
-// URL da API de leitura (Apps Script)
-const API_URL = "https://script.google.com/macros/s/AKfycbzmDVYt9ALsg9f0c8gaGdep7RVUNFokwbgHbwS6Ki8KSVF1XrcHRCfctPzfvhxNRHKUbw/exec";
+// 🔴 URL NOVA DO APPS SCRIPT
+const API_URL = "https://script.google.com/macros/s/AKfycbzU7zue4EAQHqmNAs6bNU_dzJn-qJy4tj7Y0z5GvapV_aGsIGtC3Aqgxo3Y87lb4Nuvsw/exec";
+const UPDATE_STATUS_URL = "https://script.google.com/macros/s/AKfycbzU7zue4EAQHqmNAs6bNU_dzJn-qJy4tj7Y0z5GvapV_aGsIGtC3Aqgxo3Y87lb4Nuvsw/exec";
 
-// URL para atualizar status (mesmo Apps Script com doPost)
-const UPDATE_STATUS_URL = "https://script.google.com/macros/s/AKfycbzmDVYt9ALsg9f0c8gaGdep7RVUNFokwbgHbwS6Ki8KSVF1XrcHRCfctPzfvhxNRHKUbw/exec";
+let currentRole = null;
+let allData = [];
 
-let currentRole = null; // "master" ou "consultor"
-let allData = []; // Dados carregados da API
+console.log("✅ App Maxime inicializado – Conectado à API real");
 
-// ====== LOGIN ======
-
+// ===== LOGIN =====
 async function handleLogin() {
   const role = document.getElementById("role").value;
-  const password = document.getElementById("password").value.trim();
+  const password = document.getElementById("password").value;
   const errorEl = document.getElementById("login-error");
 
-  let ok = false;
-  if (role === "master" && password === MASTER_PASSWORD) ok = true;
-  if (role === "consultor" && password === CONSULTOR_PASSWORD) ok = true;
-
-  if (!ok) {
-    errorEl.textContent = "Usuário ou senha inválidos.";
+  if (!role || !password) {
+    errorEl.textContent = "Preencha todos os campos!";
     return;
   }
 
-  // Tenta carregar dados da API
-  try {
-    errorEl.textContent = "Carregando dados...";
-    await fetchDataFromAPI();
-    errorEl.textContent = "";
-  } catch (err) {
-    errorEl.textContent = "Erro ao carregar dados: " + err.message;
-    console.error("Erro na API:", err);
+  const correctPassword = role === "master" ? MASTER_PASSWORD : CONSULTOR_PASSWORD;
+
+  if (password !== correctPassword) {
+    errorEl.textContent = "Senha incorreta!";
     return;
   }
 
   currentRole = role;
-  document.getElementById("password").value = "";
-
   document.getElementById("login-view").style.display = "none";
   document.getElementById("consulta-view").style.display = "block";
 
-  document.getElementById("user-role").textContent =
-    role === "master" ? "Logado como MASTER" : "Logado como CONSULTOR";
-
-  document.getElementById("master-dashboard").style.display =
-    role === "master" ? "block" : "none";
-
-  renderResults(allData);
-  if (role === "master") {
-    renderMasterDashboard(allData);
+  // Mostrar/esconder dashboard master
+  const dashboard = document.getElementById("master-dashboard");
+  if (currentRole === "master") {
+    dashboard.style.display = "block";
+    document.getElementById("user-role").textContent = "Logado como MASTER";
   } else {
-    updateDashboard(allData);
+    dashboard.style.display = "none";
+    document.getElementById("user-role").textContent = "Logado como CONSULTOR";
   }
+
+  await fetchDataFromAPI();
 }
 
+// ===== FETCH DATA =====
 async function fetchDataFromAPI() {
   try {
     const response = await fetch(API_URL);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    const result = await response.json();
+    allData = result.data || [];
+    console.log(`✅ Dados carregados da API: ${allData.length} registros`);
+    renderResults();
+    if (currentRole === "master") {
+      renderMasterDashboard();
     }
-
-    const json = await response.json();
-    
-    if (!json.data || !Array.isArray(json.data)) {
-      throw new Error("Resposta da API inválida");
-    }
-
-    allData = json.data;
-    console.log("✅ Dados carregados da API:", allData.length, "registros");
-
-  } catch (err) {
-    console.error("❌ Erro ao buscar dados:", err);
-    throw err;
+  } catch (error) {
+    console.error("Erro ao buscar dados:", error);
+    alert("Erro ao carregar dados!");
   }
 }
 
+// ===== LOGOUT =====
 function handleLogout() {
   currentRole = null;
-  allData = [];
-  document.getElementById("consulta-view").style.display = "none";
   document.getElementById("login-view").style.display = "block";
-  document.getElementById("search-name").value = "";
+  document.getElementById("consulta-view").style.display = "none";
+  document.getElementById("role").value = "consultor";
+  document.getElementById("password").value = "";
   document.getElementById("login-error").textContent = "";
+  document.getElementById("search-name").value = "";
+  allData = [];
 }
 
-// ====== BUSCA ======
-
+// ===== BUSCA =====
 function handleSearch() {
-  const term = document
-    .getElementById("search-name")
-    .value.trim()
-    .toLowerCase();
-
-  if (!term) {
-    renderResults(allData);
-    if (currentRole === "master") {
-      renderMasterDashboard(allData);
-    } else {
-      updateDashboard(allData);
-    }
+  const searchTerm = document.getElementById("search-name").value.toLowerCase();
+  if (searchTerm === "") {
+    renderResults();
     return;
   }
 
-  const filtered = allData.filter((row) =>
-    row.nome.toLowerCase().includes(term)
+  const filtered = allData.filter(row =>
+    row.nome.toLowerCase().includes(searchTerm)
   );
-
-  renderResults(filtered);
-  if (currentRole === "master") {
-    renderMasterDashboard(filtered);
-  } else {
-    updateDashboard(filtered);
-  }
+  renderTable(filtered);
 }
 
-function renderResults(rows) {
-  const tbody = document
-    .getElementById("results-table")
-    .querySelector("tbody");
+// ===== RENDER RESULTS =====
+function renderResults() {
+  renderTable(allData);
+}
 
+// ===== RENDER TABLE =====
+function renderTable(data) {
+  const tbody = document.querySelector("#results-table tbody");
   tbody.innerHTML = "";
 
-  if (!rows || rows.length === 0) {
-    const tr = document.createElement("tr");
-    const td = document.createElement("td");
-    td.colSpan = 8;
-    td.textContent = "Nenhum registro encontrado.";
-    tr.appendChild(td);
-    tbody.appendChild(tr);
+  if (data.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px;">Nenhum resultado encontrado</td></tr>`;
     return;
   }
 
-  rows.forEach((row, index) => {
+  data.forEach(row => {
     const tr = document.createElement("tr");
 
-    const tdDataHora = document.createElement("td");
-    tdDataHora.textContent = formatarData(row.dataHora);
-    tr.appendChild(tdDataHora);
-
-    const tdNome = document.createElement("td");
-    tdNome.textContent = row.nome || "";
-    tr.appendChild(tdNome);
-
-    const tdEmail = document.createElement("td");
-    tdEmail.textContent = row.email || "";
-    tr.appendChild(tdEmail);
-
-    const tdWhats = document.createElement("td");
-    tdWhats.textContent = row.whatsapp || "";
-    tr.appendChild(tdWhats);
-
-    const tdDataCas = document.createElement("td");
-    tdDataCas.textContent = formatarData(row.dataCasamento);
-    tr.appendChild(tdDataCas);
-
-    const tdConsultor = document.createElement("td");
-    tdConsultor.textContent = row.consultor || "";
-    tr.appendChild(tdConsultor);
-
-    // 🆕 COLUNA DE OBSERVAÇÕES (M) - CLICÁVEL
-    const tdObservacao = document.createElement("td");
-    tdObservacao.textContent = row.observacao || "";
-    tdObservacao.style.maxWidth = "300px";
-    tdObservacao.style.wordWrap = "break-word";
-    tdObservacao.style.cursor = "pointer";
-    tdObservacao.style.color = "#4CAF50";
-    tdObservacao.style.textDecoration = "underline";
-    tdObservacao.title = "Clique para ver mais";
-    tdObservacao.addEventListener("click", () => {
-      openObservacaoModal(row.nome, row.observacao);
-    });
-    tr.appendChild(tdObservacao);
-
-    // 🆕 STATUS EDITÁVEL
-    const tdStatus = document.createElement("td");
-    tdStatus.style.padding = "4px";
-    
+    // Status dropdown para Consultor, texto para Master
+    let statusCell = "";
     if (currentRole === "consultor") {
-      // Para consultor, mostra um select
-      const select = document.createElement("select");
-      select.style.width = "100%";
-      select.style.padding = "6px 4px";
-      select.style.borderRadius = "4px";
-      select.style.fontWeight = "bold";
-      select.style.border = "1px solid #ddd";
-      select.style.cursor = "pointer";
-      
-      select.innerHTML = `
-        <option value="">Selecione...</option>
-        <option value="SIM">SIM</option>
-        <option value="AGUARDANDO">AGUARDANDO</option>
-        <option value="NÃO">NÃO</option>
+      statusCell = `
+        <select onchange="updateStatus('${row.nome}', this.value)" class="status-select">
+          <option value="AGUARDANDO" ${row.status === "AGUARDANDO" ? "selected" : ""}>AGUARDANDO</option>
+          <option value="SIM" ${row.status === "SIM" ? "selected" : ""}>SIM</option>
+          <option value="NÃO" ${row.status === "NÃO" ? "selected" : ""}>NÃO</option>
+        </select>
       `;
-      select.value = row.status || "";
-      
-      // Aplica cor inicial
-      atualizarCorStatus(select, row.status);
-      
-      select.addEventListener("change", async (e) => {
-        const newStatus = e.target.value;
-        if (!newStatus) return;
-        
-        // Atualiza cor imediatamente
-        atualizarCorStatus(select, newStatus);
-        
-        try {
-          select.disabled = true;
-          select.style.opacity = "0.7";
-          await updateStatusInSheet(row.nome, newStatus);
-          row.status = newStatus;
-          
-          // Recarrega dados da API
-          await fetchDataFromAPI();
-          renderResults(allData);
-          updateDashboard(allData);
-        } catch (err) {
-          alert("Erro ao atualizar status: " + err.message);
-          select.value = row.status;
-          atualizarCorStatus(select, row.status);
-          select.disabled = false;
-          select.style.opacity = "1";
-        }
-      });
-      
-      tdStatus.appendChild(select);
     } else {
-      // Para master, mostra apenas o valor com cor
-      tdStatus.textContent = row.status || "";
-      aplicarCorStatus(tdStatus, row.status);
+      const statusColor = row.status === "SIM" ? "#4CAF50" : row.status === "NÃO" ? "#F44336" : "#FFC107";
+      const statusText = row.status || "SEM STATUS";
+      statusCell = `<span style="background-color: ${statusColor}; color: white; padding: 5px 10px; border-radius: 3px; font-size: 12px;">${statusText}</span>`;
     }
-    
-    tr.appendChild(tdStatus);
+
+    // Observações clicável
+    let obsCell = "";
+    if (row.observacao && row.observacao.trim()) {
+      const obsText = row.observacao.substring(0, 30) + (row.observacao.length > 30 ? "..." : "");
+      obsCell = `<span style="color: green; text-decoration: underline; cursor: pointer; font-size: 12px;" onclick="openObservacaoModal('${row.nome.replace(/'/g, "\\'")}', '${row.observacao.replace(/'/g, "\\'").replace(/\n/g, "\\n")}')">${obsText}</span>`;
+    }
+
+    const dataFormatada = row.dataHora ? new Date(row.dataHora).toLocaleDateString('pt-BR') : "";
+
+    tr.innerHTML = `
+      <td>${dataFormatada}</td>
+      <td>${row.nome || ""}</td>
+      <td>${row.email || ""}</td>
+      <td>${row.whatsapp || ""}</td>
+      <td>${row.dataCasamento || ""}</td>
+      <td>${row.consultor || ""}</td>
+      <td>${obsCell}</td>
+      <td>${statusCell}</td>
+    `;
+
     tbody.appendChild(tr);
   });
 }
 
-// ====== FUNÇÕES DE COR DO STATUS ======
-
-function atualizarCorStatus(select, status) {
-  if (status === "SIM") {
-    select.style.backgroundColor = "#4CAF50";
-    select.style.color = "white";
-  } else if (status === "NÃO") {
-    select.style.backgroundColor = "#F44336";
-    select.style.color = "white";
-  } else if (status === "AGUARDANDO") {
-    select.style.backgroundColor = "#FFC107";
-    select.style.color = "black";
-  } else {
-    select.style.backgroundColor = "white";
-    select.style.color = "#333";
-  }
-}
-
-function aplicarCorStatus(elemento, status) {
-  if (status === "SIM") {
-    elemento.style.backgroundColor = "#4CAF50";
-    elemento.style.color = "white";
-    elemento.style.fontWeight = "bold";
-  } else if (status === "NÃO") {
-    elemento.style.backgroundColor = "#F44336";
-    elemento.style.color = "white";
-    elemento.style.fontWeight = "bold";
-  } else if (status === "AGUARDANDO") {
-    elemento.style.backgroundColor = "#FFC107";
-    elemento.style.color = "black";
-    elemento.style.fontWeight = "bold";
-  }
-}
-
-// ====== MODAL DE OBSERVAÇÕES ======
-
+// ===== MODAL OBSERVAÇÕES =====
 function openObservacaoModal(nome, observacao) {
-  const modal = document.getElementById("observacao-modal");
-  if (!modal) {
-    console.error("Modal não encontrado!");
-    return;
-  }
+  document.getElementById("observacao-modal").style.display = "block";
   document.getElementById("observacao-nome").textContent = nome;
-  document.getElementById("observacao-texto").textContent = observacao || "(Sem observações)";
-  modal.style.display = "block";
+  document.getElementById("observacao-texto").textContent = observacao;
 }
 
 function closeObservacaoModal() {
-  const modal = document.getElementById("observacao-modal");
-  if (modal) {
-    modal.style.display = "none";
-  }
+  document.getElementById("observacao-modal").style.display = "none";
 }
 
-// Fechar modal ao clicar fora
-window.addEventListener("click", (e) => {
+// Fechar modal ao clicar no X
+document.addEventListener("DOMContentLoaded", function() {
   const modal = document.getElementById("observacao-modal");
-  if (modal && e.target === modal) {
-    modal.style.display = "none";
+  const closeBtn = document.getElementById("close-modal-btn");
+  const closeBtnFooter = document.getElementById("close-modal-btn-footer");
+
+  if (closeBtn) {
+    closeBtn.onclick = closeObservacaoModal;
+  }
+  if (closeBtnFooter) {
+    closeBtnFooter.onclick = closeObservacaoModal;
+  }
+
+  window.onclick = function(event) {
+    if (event.target === modal) {
+      modal.style.display = "none";
+    }
+  };
+
+  // Event listeners dos botões
+  const loginBtn = document.getElementById("login-btn");
+  const logoutBtn = document.getElementById("logout-btn");
+  const searchBtn = document.getElementById("search-btn");
+  const searchInput = document.getElementById("search-name");
+  const passwordInput = document.getElementById("password");
+
+  if (loginBtn) loginBtn.onclick = handleLogin;
+  if (logoutBtn) logoutBtn.onclick = handleLogout;
+  if (searchBtn) searchBtn.onclick = handleSearch;
+
+  if (searchInput) {
+    searchInput.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") handleSearch();
+    });
+  }
+
+  if (passwordInput) {
+    passwordInput.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") handleLogin();
+    });
   }
 });
 
-// ====== ATUALIZAR STATUS NA PLANILHA ======
-
-async function updateStatusInSheet(nome, novoStatus) {
+// ===== UPDATE STATUS =====
+async function updateStatus(nome, novoStatus) {
   try {
     const response = await fetch(UPDATE_STATUS_URL, {
       method: "POST",
@@ -319,290 +215,144 @@ async function updateStatusInSheet(nome, novoStatus) {
     });
 
     const result = await response.text();
-    console.log("Resposta do servidor:", result);
-
-    if (!response.ok) {
-      throw new Error("Erro ao atualizar: " + result);
-    }
-
-    return true;
-
-  } catch (err) {
-    console.error("❌ Erro ao atualizar status:", err);
-    throw err;
+    console.log("Status atualizado:", result);
+    await fetchDataFromAPI();
+  } catch (error) {
+    console.error("Erro ao atualizar status:", error);
+    alert("Erro ao atualizar status!");
   }
 }
 
-// Formata datas que vêm do Google Sheets
-function formatarData(valor) {
-  if (!valor) return "";
-  
-  // Se for número (timestamp do Sheets)
-  if (typeof valor === "number") {
-    const date = new Date((valor - 25569) * 86400 * 1000);
-    return date.toLocaleDateString("pt-BR");
+// ===== RENDER MASTER DASHBOARD =====
+function renderMasterDashboard() {
+  const dashboard = document.getElementById("master-dashboard");
+
+  if (allData.length === 0) {
+    dashboard.innerHTML = "<p>Nenhum dado disponível</p>";
+    return;
   }
 
-  // Se for string, tenta parsear
-  if (typeof valor === "string") {
-    const date = new Date(valor);
-    if (!isNaN(date.getTime())) {
-      return date.toLocaleDateString("pt-BR");
-    }
-    return valor; // Retorna como estava se não conseguir parsear
-  }
-
-  return "";
-}
-
-// ====== DASHBOARD CONSULTOR ======
-
-function updateDashboard(rows) {
-  const total = rows.length;
-  const fecharam = rows.filter((r) => r.status === "SIM").length;
-  const nao = rows.filter((r) => r.status === "NÃO").length;
-  const aguardando = rows.filter((r) => r.status === "AGUARDANDO").length;
-
-  document.getElementById("dash-total").textContent = total;
-  document.getElementById("dash-fecharam").textContent = fecharam;
-  document.getElementById("dash-nao").textContent = nao;
-  document.getElementById("dash-aguardando").textContent = aguardando;
-}
-
-// ====== DASHBOARD MASTER - KPI ======
-
-function renderMasterDashboard(rows) {
-  const total = rows.length;
-  const fecharam = rows.filter((r) => r.status === "SIM").length;
-  const nao = rows.filter((r) => r.status === "NÃO").length;
-  const aguardando = rows.filter((r) => r.status === "AGUARDANDO").length;
-
-  const hoje = new Date();
-  const semanaPassada = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const mesPassado = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const total = allData.length;
+  const fecharam = allData.filter(r => r.status === "SIM").length;
+  const naoFecharam = allData.filter(r => r.status === "NÃO").length;
+  const aguardando = allData.filter(r => r.status === "AGUARDANDO").length;
+  const taxa = total > 0 ? ((fecharam / total) * 100).toFixed(2) : 0;
 
   // Filtros por período
-  const estaSemana = rows.filter((r) => {
-    const data = parseDataRS(r.dataHora);
-    return data >= semanaPassada && r.status === "SIM";
+  const agora = new Date();
+  const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
+  const seteeDiasAtras = new Date(agora.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const trintaDiasAtras = new Date(agora.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const estaSemana = allData.filter(r => {
+    const d = new Date(r.dataHora);
+    return r.status === "SIM" && d >= seteeDiasAtras && d <= agora;
+  }).length;
+
+  const esteMes = allData.filter(r => {
+    const d = new Date(r.dataHora);
+    return r.status === "SIM" && d >= inicioMes && d <= agora;
+  }).length;
+
+  const ultimos30 = allData.filter(r => {
+    const d = new Date(r.dataHora);
+    return r.status === "SIM" && d >= trintaDiasAtras && d <= agora;
+  }).length;
+
+  // Top Consultores
+  const consultoresMap = {};
+  allData.forEach(r => {
+    if (r.status === "SIM" && r.consultor) {
+      consultoresMap[r.consultor] = (consultoresMap[r.consultor] || 0) + 1;
+    }
   });
+  const topConsultores = Object.entries(consultoresMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
 
-  const esteMs = rows.filter((r) => {
-    const data = parseDataRS(r.dataHora);
-    return data >= inicioMes && r.status === "SIM";
+  // Top Fotógrafos
+  const fotografosMap = {};
+  allData.forEach(r => {
+    if (r.fotografo) {
+      fotografosMap[r.fotografo] = (fotografosMap[r.fotografo] || 0) + 1;
+    }
   });
+  const topFotografos = Object.entries(fotografosMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
 
-  const ultimos30 = rows.filter((r) => {
-    const data = parseDataRS(r.dataHora);
-    return data >= mesPassado && r.status === "SIM";
+  // Top Cerimoniais
+  const cerimonialMap = {};
+  allData.forEach(r => {
+    if (r.cerimonial) {
+      cerimonialMap[r.cerimonial] = (cerimonialMap[r.cerimonial] || 0) + 1;
+    }
   });
+  const topCerimoniais = Object.entries(cerimonialMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
 
-  // TOP Consultores (SIM)
-  const topConsultores = calcularTopConsultores(rows);
-
-  // TOP Fotógrafos (mais indicados)
-  const topFotografos = calcularTopFotografos(rows);
-
-  // TOP Cerimoniais (mais indicados)
-  const topCerimoniais = calcularTopCerimoniais(rows);
-
-  // Taxa de conversão
-  const taxaConversao = total > 0 ? ((fecharam / total) * 100).toFixed(1) : 0;
-
-  // Renderizar
-  const dashboardHTML = `
-    <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
-      <h2 style="text-align: center; color: #333; margin-bottom: 20px;">📊 DASHBOARD MASTER - KPI</h2>
-
-      <!-- INDICADORES PRINCIPAIS -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 30px;">
-        <div style="background: white; padding: 15px; border-radius: 6px; border-left: 4px solid #4CAF50; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          <div style="color: #888; font-size: 13px; margin-bottom: 8px;">Total de Formulários</div>
-          <div style="font-size: 32px; font-weight: bold; color: #4CAF50;">${total}</div>
-        </div>
-
-        <div style="background: white; padding: 15px; border-radius: 6px; border-left: 4px solid #4CAF50; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          <div style="color: #888; font-size: 13px; margin-bottom: 8px;">Fecharam Aluguel</div>
-          <div style="font-size: 32px; font-weight: bold; color: #4CAF50;">${fecharam}</div>
-        </div>
-
-        <div style="background: white; padding: 15px; border-radius: 6px; border-left: 4px solid #F44336; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          <div style="color: #888; font-size: 13px; margin-bottom: 8px;">Não Fecharam</div>
-          <div style="font-size: 32px; font-weight: bold; color: #F44336;">${nao}</div>
-        </div>
-
-        <div style="background: white; padding: 15px; border-radius: 6px; border-left: 4px solid #FFC107; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          <div style="color: #888; font-size: 13px; margin-bottom: 8px;">Aguardando Fechamento</div>
-          <div style="font-size: 32px; font-weight: bold; color: #FFC107;">${aguardando}</div>
-        </div>
-
-        <div style="background: white; padding: 15px; border-radius: 6px; border-left: 4px solid #2196F3; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          <div style="color: #888; font-size: 13px; margin-bottom: 8px;">Taxa de Conversão</div>
-          <div style="font-size: 32px; font-weight: bold; color: #2196F3;">${taxaConversao}%</div>
-        </div>
+  dashboard.innerHTML = `
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px;">
+      <div style="border-left: 4px solid #4CAF50; padding: 15px; background: #f5f5f5; border-radius: 5px;">
+        <div style="font-size: 12px; color: #666;">Total de Formulários</div>
+        <div style="font-size: 24px; font-weight: bold;">${total}</div>
       </div>
-
-      <!-- FILTROS POR PERÍODO -->
-      <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <h3 style="color: #333; margin: 0 0 15px 0; font-size: 16px;">📅 Fechamentos por Período</h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-          <div>
-            <div style="color: #888; font-size: 12px;">Esta Semana</div>
-            <div style="font-size: 24px; font-weight: bold; color: #4CAF50;">${estaSemana.length}</div>
-          </div>
-          <div>
-            <div style="color: #888; font-size: 12px;">Este Mês</div>
-            <div style="font-size: 24px; font-weight: bold; color: #4CAF50;">${esteMs.length}</div>
-          </div>
-          <div>
-            <div style="color: #888; font-size: 12px;">Últimos 30 dias</div>
-            <div style="font-size: 24px; font-weight: bold; color: #4CAF50;">${ultimos30.length}</div>
-          </div>
-        </div>
+      <div style="border-left: 4px solid #4CAF50; padding: 15px; background: #f5f5f5; border-radius: 5px;">
+        <div style="font-size: 12px; color: #666;">Fecharam Aluguel</div>
+        <div style="font-size: 24px; font-weight: bold;">${fecharam}</div>
       </div>
+      <div style="border-left: 4px solid #F44336; padding: 15px; background: #f5f5f5; border-radius: 5px;">
+        <div style="font-size: 12px; color: #666;">Não Fecharam</div>
+        <div style="font-size: 24px; font-weight: bold;">${naoFecharam}</div>
+      </div>
+      <div style="border-left: 4px solid #FFC107; padding: 15px; background: #f5f5f5; border-radius: 5px;">
+        <div style="font-size: 12px; color: #666;">Aguardando</div>
+        <div style="font-size: 24px; font-weight: bold;">${aguardando}</div>
+      </div>
+      <div style="border-left: 4px solid #2196F3; padding: 15px; background: #f5f5f5; border-radius: 5px;">
+        <div style="font-size: 12px; color: #666;">Taxa de Conversão</div>
+        <div style="font-size: 24px; font-weight: bold;">${taxa}%</div>
+      </div>
+    </div>
 
-      <!-- TOP CONSULTORES -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-        <!-- TOP CONSULTORES (SIM) -->
-        <div style="background: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          <h3 style="color: #333; margin: 0 0 15px 0; font-size: 16px;">👥 Top Consultores (Fechamentos SIM)</h3>
-          <div style="font-size: 13px;">
-            ${topConsultores.map((c, i) => `
-              <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
-                <span style="color: #333;">${i + 1}. <strong>${c.nome}</strong></span>
-                <span style="background: #4CAF50; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${c.count}</span>
-              </div>
-            `).join('')}
-          </div>
+    <div style="margin-bottom: 30px;">
+      <h3>Fechamentos por Período (SIM)</h3>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+        <div style="padding: 15px; background: #e8f5e9; border-radius: 5px;">
+          <div style="font-size: 12px;">Esta Semana</div>
+          <div style="font-size: 20px; font-weight: bold;">${estaSemana}</div>
         </div>
-
-        <!-- TOP FOTÓGRAFOS -->
-        <div style="background: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          <h3 style="color: #333; margin: 0 0 15px 0; font-size: 16px;">📷 Top Fotógrafos (Mais Indicados)</h3>
-          <div style="font-size: 13px;">
-            ${topFotografos.map((f, i) => `
-              <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
-                <span style="color: #333;">${i + 1}. <strong>${f.nome || '(Vazio)'}</strong></span>
-                <span style="background: #2196F3; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${f.count}</span>
-              </div>
-            `).join('')}
-          </div>
+        <div style="padding: 15px; background: #e8f5e9; border-radius: 5px;">
+          <div style="font-size: 12px;">Este Mês</div>
+          <div style="font-size: 20px; font-weight: bold;">${esteMes}</div>
         </div>
-
-        <!-- TOP CERIMONIAIS -->
-        <div style="background: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          <h3 style="color: #333; margin: 0 0 15px 0; font-size: 16px;">💒 Top Cerimoniais (Mais Indicados)</h3>
-          <div style="font-size: 13px;">
-            ${topCerimoniais.map((c, i) => `
-              <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
-                <span style="color: #333;">${i + 1}. <strong>${c.nome || '(Vazio)'}</strong></span>
-                <span style="background: #FF9800; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${c.count}</span>
-              </div>
-            `).join('')}
-          </div>
+        <div style="padding: 15px; background: #e8f5e9; border-radius: 5px;">
+          <div style="font-size: 12px;">Últimos 30 dias</div>
+          <div style="font-size: 20px; font-weight: bold;">${ultimos30}</div>
         </div>
       </div>
     </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+      <div>
+        <h4>Top Consultores</h4>
+        <ul style="list-style: none; padding: 0;">
+          ${topConsultores.length > 0 ? topConsultores.map(([consultor, count]) => `<li>${consultor}: ${count}</li>`).join("") : "<li>Sem dados</li>"}
+        </ul>
+      </div>
+      <div>
+        <h4>Top Fotógrafos</h4>
+        <ul style="list-style: none; padding: 0;">
+          ${topFotografos.length > 0 ? topFotografos.map(([fotografo, count]) => `<li>${fotografo}: ${count}</li>`).join("") : "<li>Sem dados</li>"}
+        </ul>
+      </div>
+      <div>
+        <h4>Top Cerimoniais</h4>
+        <ul style="list-style: none; padding: 0;">
+          ${topCerimoniais.length > 0 ? topCerimoniais.map(([cerimonial, count]) => `<li>${cerimonial}: ${count}</li>`).join("") : "<li>Sem dados</li>"}
+        </ul>
+      </div>
+    </div>
   `;
-
-  document.getElementById("master-dashboard").innerHTML = dashboardHTML;
 }
-
-// ====== FUNÇÕES AUXILIARES PARA CALCULAR TOP ======
-
-function calcularTopConsultores(rows) {
-  const map = {};
-  rows.forEach((r) => {
-    if (r.status === "SIM" && r.consultor) {
-      const nome = r.consultor.trim();
-      map[nome] = (map[nome] || 0) + 1;
-    }
-  });
-
-  return Object.entries(map)
-    .map(([nome, count]) => ({ nome, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-}
-
-function calcularTopFotografos(rows) {
-  const map = {};
-  rows.forEach((r) => {
-    if (r.fotografo) {
-      const nome = r.fotografo.trim();
-      map[nome] = (map[nome] || 0) + 1;
-    }
-  });
-
-  return Object.entries(map)
-    .map(([nome, count]) => ({ nome, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-}
-
-function calcularTopCerimoniais(rows) {
-  const map = {};
-  rows.forEach((r) => {
-    if (r.cerimonial) {
-      const nome = r.cerimonial.trim();
-      map[nome] = (map[nome] || 0) + 1;
-    }
-  });
-
-  return Object.entries(map)
-    .map(([nome, count]) => ({ nome, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-}
-
-function parseDataRS(valor) {
-  if (!valor) return new Date(0);
-  
-  if (typeof valor === "number") {
-    return new Date((valor - 25569) * 86400 * 1000);
-  }
-
-  if (typeof valor === "string") {
-    return new Date(valor);
-  }
-
-  return new Date(0);
-}
-
-// ====== INICIALIZAÇÃO ======
-
-function init() {
-  document
-    .getElementById("login-btn")
-    .addEventListener("click", handleLogin);
-  document
-    .getElementById("logout-btn")
-    .addEventListener("click", handleLogout);
-  document
-    .getElementById("search-btn")
-    .addEventListener("click", handleSearch);
-
-  // Modal close buttons
-  const closeBtn1 = document.getElementById("close-modal-btn");
-  const closeBtn2 = document.getElementById("close-modal-btn-footer");
-  
-  if (closeBtn1) closeBtn1.addEventListener("click", closeObservacaoModal);
-  if (closeBtn2) closeBtn2.addEventListener("click", closeObservacaoModal);
-
-  document
-    .getElementById("password")
-    .addEventListener("keyup", (e) => {
-      if (e.key === "Enter") handleLogin();
-    });
-
-  document
-    .getElementById("search-name")
-    .addEventListener("keyup", (e) => {
-      if (e.key === "Enter") handleSearch();
-    });
-
-  console.log("✅ App Maxime inicializado - Conectado à API real");
-}
-
-document.addEventListener("DOMContentLoaded", init);
