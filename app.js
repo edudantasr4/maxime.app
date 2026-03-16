@@ -2,9 +2,10 @@
 const MASTER_PASSWORD = "master123";
 const CONSULTOR_PASSWORD = "consultor123";
 
-// 🔴 URL NOVA DO APPS SCRIPT
-const API_URL = "https://script.google.com/macros/s/AKfycbzU7zue4EAQHqmNAs6bNU_dzJn-qJy4tj7Y0z5GvapV_aGsIGtC3Aqgxo3Y87lb4Nuvsw/exec";
-const UPDATE_STATUS_URL = "https://script.google.com/macros/s/AKfycbzU7zue4EAQHqmNAs6bNU_dzJn-qJy4tj7Y0z5GvapV_aGsIGtC3Aqgxo3Y87lb4Nuvsw/exec";
+// 🔴 URL DO WORKER (intermediário para evitar CORS)
+const WORKER_URL = "https://maxime.eduardo-0a6.workers.dev/";
+const API_URL = WORKER_URL;
+const UPDATE_STATUS_URL = WORKER_URL;
 
 let currentRole = null;
 let allData = [];
