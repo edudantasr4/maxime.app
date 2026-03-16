@@ -16,10 +16,11 @@ emailjs.init(EMAILJS_PUBLIC_KEY);
 
 let currentRole = null;
 let allData = [];
-let ultimoRegistroEnviado = null;
 let ultimasDataVerificada = null;
+let registrosJaProcessados = new Set();
 
 console.log("✅ App Maxime inicializado – Conectado à API real");
+console.log("📧 EmailJS inicializado com Public Key:", EMAILJS_PUBLIC_KEY.substring(0, 10) + "...");
 
 // ===== VERIFICAR NOVOS REGISTROS A CADA 2 SEGUNDOS =====
 setInterval(async () => {
@@ -33,25 +34,41 @@ async function verificarNovoRegistro() {
     const result = await response.json();
     const data = result.data || [];
 
-    if (data.length === 0) return;
+    if (data.length === 0) {
+      console.log("⚠️ Nenhum registro na API");
+      return;
+    }
 
     const ultimoRegistro = data[0]; // O mais recente está no topo
-    const dataAtual = ultimoRegistro.dataHora ? new Date(ultimoRegistro.dataHora).getTime() : 0;
+    const nomeUnico = ultimoRegistro.nome + "_" + ultimoRegistro.dataHora;
 
-    // Se é um registro novo (diferente do último verificado)
-    if (ultimasDataVerificada !== dataAtual && ultimoRegistro.email) {
-      console.log("🆕 NOVO REGISTRO DETECTADO:", ultimoRegistro.nome);
-      ultimasDataVerificada = dataAtual;
+    // Se já processamos este registro, skip
+    if (registrosJaProcessados.has(nomeUnico)) {
+      console.log("⏭️ Registro já processado:", ultimoRegistro.nome);
+      return;
+    }
 
-      // Enviar email imediatamente
+    console.log("🔍 Verificando novo registro:", {
+      nome: ultimoRegistro.nome,
+      email: ultimoRegistro.email,
+      data: ultimoRegistro.dataHora
+    });
+
+    // Se tem email válido, enviar
+    if (ultimoRegistro.email && ultimoRegistro.email.trim() !== "") {
+      console.log("🆕 NOVO REGISTRO COM EMAIL DETECTADO:", ultimoRegistro.nome);
+      registrosJaProcessados.add(nomeUnico);
+      
       await enviarEmailComEmailJS(
         ultimoRegistro.email,
         ultimoRegistro.nome,
         ultimoRegistro.observacao
       );
+    } else {
+      console.log("❌ Registro sem email:", ultimoRegistro.nome);
     }
   } catch (error) {
-    console.error("Erro ao verificar novo registro:", error);
+    console.error("❌ Erro ao verificar novo registro:", error);
   }
 }
 
@@ -270,12 +287,10 @@ async function updateStatus(nome, novoStatus) {
 // ===== ENVIAR EMAIL COM EMAILJS =====
 async function enviarEmailComEmailJS(email, nome, observacao) {
   try {
-    if (!email || email.trim() === "") {
-      console.log("❌ Email vazio, não enviando");
-      return false;
-    }
-
-    console.log("📧📧📧 ENVIANDO EMAIL PARA:", email);
+    console.log("📧 [1/5] Iniciando envio de email...");
+    console.log("📧 [2/5] Email:", email);
+    console.log("📧 [3/5] Nome:", nome);
+    console.log("📧 [4/5] Template ID:", EMAILJS_TEMPLATE_ID);
 
     const templateParams = {
       to_email: email,
@@ -284,17 +299,22 @@ async function enviarEmailComEmailJS(email, nome, observacao) {
       data_envio: new Date().toLocaleDateString('pt-BR')
     };
 
+    console.log("📧 [5/5] Parâmetros:", templateParams);
+
     const response = await emailjs.send(
       EMAILJS_SERVICE_ID,
       EMAILJS_TEMPLATE_ID,
       templateParams
     );
 
-    console.log("✅✅✅ EMAIL ENVIADO COM SUCESSO PARA:", email);
+    console.log("✅✅✅ EMAIL ENVIADO COM SUCESSO!");
     console.log("Resposta EmailJS:", response);
     return true;
   } catch (error) {
-    console.error("❌❌❌ ERRO AO ENVIAR EMAIL:", error);
+    console.error("❌❌❌ ERRO AO ENVIAR EMAIL:");
+    console.error("Tipo de erro:", error.status);
+    console.error("Mensagem:", error.message || error.text);
+    console.error("Resposta completa:", error);
     return false;
   }
 }
