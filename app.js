@@ -1,12 +1,16 @@
-
-
 // ===== CONFIGURAÇÕES BÁSICAS =====
 const MASTER_PASSWORD = "master123";
 const CONSULTOR_PASSWORD = "consultor123";
-const API_URL =
-  "https://script.google.com/macros/s/AKfycbzU7zue4EAQHqmNAs6bNU_dzJn-qJy4tj7Y0z5GvapV_aGsIGtC3Aqgxo3Y87lb4Nuvsw/exec";
-const UPDATE_STATUS_URL =
-  "https://script.google.com/macros/s/AKfycbzU7zue4EAQHqmNAs6bNU_dzJn-qJy4tj7Y0z5GvapV_aGsIGtC3Aqgxo3Y87lb4Nuvsw/exec";
+
+// 🔴 URL DO WORKER (intermediário para evitar CORS)
+const WORKER_URL = "https://maxime.eduardo-0a6.workers.dev/";
+const API_URL = WORKER_URL;
+const UPDATE_STATUS_URL = WORKER_URL;
+
+let currentRole = null;
+let allData = [];
+
+console.log("✅ App Maxime inicializado – Conectado à API real");
 
 // ===== LOGIN =====
 async function handleLogin() {
@@ -19,8 +23,7 @@ async function handleLogin() {
     return;
   }
 
-  const correctPassword =
-    role === "master" ? MASTER_PASSWORD : CONSULTOR_PASSWORD;
+  const correctPassword = role === "master" ? MASTER_PASSWORD : CONSULTOR_PASSWORD;
 
   if (password !== correctPassword) {
     errorEl.textContent = "Senha incorreta!";
@@ -28,15 +31,17 @@ async function handleLogin() {
   }
 
   currentRole = role;
-  document.getElementById("login-screen").style.display = "none";
-  document.getElementById("app-screen").style.display = "block";
+  document.getElementById("login-view").style.display = "none";
+  document.getElementById("consulta-view").style.display = "block";
 
   // Mostrar/esconder dashboard master
   const dashboard = document.getElementById("master-dashboard");
   if (currentRole === "master") {
     dashboard.style.display = "block";
+    document.getElementById("user-role").textContent = "Logado como MASTER";
   } else {
     dashboard.style.display = "none";
+    document.getElementById("user-role").textContent = "Logado como CONSULTOR";
   }
 
   await fetchDataFromAPI();
@@ -48,6 +53,7 @@ async function fetchDataFromAPI() {
     const response = await fetch(API_URL);
     const result = await response.json();
     allData = result.data || [];
+    console.log(`✅ Dados carregados da API: ${allData.length} registros`);
     renderResults();
     if (currentRole === "master") {
       renderMasterDashboard();
@@ -61,25 +67,25 @@ async function fetchDataFromAPI() {
 // ===== LOGOUT =====
 function handleLogout() {
   currentRole = null;
-  document.getElementById("login-screen").style.display = "block";
-  document.getElementById("app-screen").style.display = "none";
-  document.getElementById("role").value = "";
+  document.getElementById("login-view").style.display = "block";
+  document.getElementById("consulta-view").style.display = "none";
+  document.getElementById("role").value = "consultor";
   document.getElementById("password").value = "";
   document.getElementById("login-error").textContent = "";
-  document.getElementById("searchInput").value = "";
+  document.getElementById("search-name").value = "";
   allData = [];
 }
 
 // ===== BUSCA =====
 function handleSearch() {
-  const searchTerm = document.getElementById("searchInput").value.toLowerCase();
+  const searchTerm = document.getElementById("search-name").value.toLowerCase();
   if (searchTerm === "") {
     renderResults();
     return;
   }
 
-  const filtered = allData.filter((row) =>
-    row.nome.toLowerCase().includes(searchTerm),
+  const filtered = allData.filter(row =>
+    row.nome.toLowerCase().includes(searchTerm)
   );
   renderTable(filtered);
 }
@@ -99,7 +105,7 @@ function renderTable(data) {
     return;
   }
 
-  data.forEach((row) => {
+  data.forEach(row => {
     const tr = document.createElement("tr");
 
     // Status dropdown para Consultor, texto para Master
@@ -113,12 +119,7 @@ function renderTable(data) {
         </select>
       `;
     } else {
-      const statusColor =
-        row.status === "SIM"
-          ? "#4CAF50"
-          : row.status === "NÃO"
-            ? "#F44336"
-            : "#FFC107";
+      const statusColor = row.status === "SIM" ? "#4CAF50" : row.status === "NÃO" ? "#F44336" : "#FFC107";
       const statusText = row.status || "SEM STATUS";
       statusCell = `<span style="background-color: ${statusColor}; color: white; padding: 5px 10px; border-radius: 3px; font-size: 12px;">${statusText}</span>`;
     }
@@ -126,15 +127,11 @@ function renderTable(data) {
     // Observações clicável
     let obsCell = "";
     if (row.observacao && row.observacao.trim()) {
-      const obsText =
-        row.observacao.substring(0, 30) +
-        (row.observacao.length > 30 ? "..." : "");
+      const obsText = row.observacao.substring(0, 30) + (row.observacao.length > 30 ? "..." : "");
       obsCell = `<span style="color: green; text-decoration: underline; cursor: pointer; font-size: 12px;" onclick="openObservacaoModal('${row.nome.replace(/'/g, "\\'")}', '${row.observacao.replace(/'/g, "\\'").replace(/\n/g, "\\n")}')">${obsText}</span>`;
     }
 
-    const dataFormatada = row.dataHora
-      ? new Date(row.dataHora).toLocaleDateString("pt-BR")
-      : "";
+    const dataFormatada = row.dataHora ? new Date(row.dataHora).toLocaleDateString('pt-BR') : "";
 
     tr.innerHTML = `
       <td>${dataFormatada}</td>
@@ -154,20 +151,56 @@ function renderTable(data) {
 // ===== MODAL OBSERVAÇÕES =====
 function openObservacaoModal(nome, observacao) {
   document.getElementById("observacao-modal").style.display = "block";
-  document.getElementById("modal-nome").textContent = nome;
-  document.getElementById("modal-observacao").textContent = observacao;
+  document.getElementById("observacao-nome").textContent = nome;
+  document.getElementById("observacao-texto").textContent = observacao;
 }
 
 function closeObservacaoModal() {
   document.getElementById("observacao-modal").style.display = "none";
 }
 
-window.onclick = function (event) {
+// Fechar modal ao clicar no X
+document.addEventListener("DOMContentLoaded", function() {
   const modal = document.getElementById("observacao-modal");
-  if (event.target === modal) {
-    modal.style.display = "none";
+  const closeBtn = document.getElementById("close-modal-btn");
+  const closeBtnFooter = document.getElementById("close-modal-btn-footer");
+
+  if (closeBtn) {
+    closeBtn.onclick = closeObservacaoModal;
   }
-};
+  if (closeBtnFooter) {
+    closeBtnFooter.onclick = closeObservacaoModal;
+  }
+
+  window.onclick = function(event) {
+    if (event.target === modal) {
+      modal.style.display = "none";
+    }
+  };
+
+  // Event listeners dos botões
+  const loginBtn = document.getElementById("login-btn");
+  const logoutBtn = document.getElementById("logout-btn");
+  const searchBtn = document.getElementById("search-btn");
+  const searchInput = document.getElementById("search-name");
+  const passwordInput = document.getElementById("password");
+
+  if (loginBtn) loginBtn.onclick = handleLogin;
+  if (logoutBtn) logoutBtn.onclick = handleLogout;
+  if (searchBtn) searchBtn.onclick = handleSearch;
+
+  if (searchInput) {
+    searchInput.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") handleSearch();
+    });
+  }
+
+  if (passwordInput) {
+    passwordInput.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") handleLogin();
+    });
+  }
+});
 
 // ===== UPDATE STATUS =====
 async function updateStatus(nome, novoStatus) {
@@ -178,8 +211,8 @@ async function updateStatus(nome, novoStatus) {
       body: JSON.stringify({
         action: "updateStatus",
         nome: nome,
-        status: novoStatus,
-      }),
+        status: novoStatus
+      })
     });
 
     const result = await response.text();
@@ -191,7 +224,6 @@ async function updateStatus(nome, novoStatus) {
   }
 }
 
-
 // ===== RENDER MASTER DASHBOARD =====
 function renderMasterDashboard() {
   const dashboard = document.getElementById("master-dashboard");
@@ -202,9 +234,9 @@ function renderMasterDashboard() {
   }
 
   const total = allData.length;
-  const fecharam = allData.filter((r) => r.status === "SIM").length;
-  const naoFecharam = allData.filter((r) => r.status === "NÃO").length;
-  const aguardando = allData.filter((r) => r.status === "AGUARDANDO").length;
+  const fecharam = allData.filter(r => r.status === "SIM").length;
+  const naoFecharam = allData.filter(r => r.status === "NÃO").length;
+  const aguardando = allData.filter(r => r.status === "AGUARDANDO").length;
   const taxa = total > 0 ? ((fecharam / total) * 100).toFixed(2) : 0;
 
   // Filtros por período
@@ -213,24 +245,24 @@ function renderMasterDashboard() {
   const seteeDiasAtras = new Date(agora.getTime() - 7 * 24 * 60 * 60 * 1000);
   const trintaDiasAtras = new Date(agora.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const estaSemana = allData.filter((r) => {
+  const estaSemana = allData.filter(r => {
     const d = new Date(r.dataHora);
     return r.status === "SIM" && d >= seteeDiasAtras && d <= agora;
   }).length;
 
-  const esteMes = allData.filter((r) => {
+  const esteMes = allData.filter(r => {
     const d = new Date(r.dataHora);
     return r.status === "SIM" && d >= inicioMes && d <= agora;
   }).length;
 
-  const ultimos30 = allData.filter((r) => {
+  const ultimos30 = allData.filter(r => {
     const d = new Date(r.dataHora);
     return r.status === "SIM" && d >= trintaDiasAtras && d <= agora;
   }).length;
 
   // Top Consultores
   const consultoresMap = {};
-  allData.forEach((r) => {
+  allData.forEach(r => {
     if (r.status === "SIM" && r.consultor) {
       consultoresMap[r.consultor] = (consultoresMap[r.consultor] || 0) + 1;
     }
@@ -241,7 +273,7 @@ function renderMasterDashboard() {
 
   // Top Fotógrafos
   const fotografosMap = {};
-  allData.forEach((r) => {
+  allData.forEach(r => {
     if (r.fotografo) {
       fotografosMap[r.fotografo] = (fotografosMap[r.fotografo] || 0) + 1;
     }
@@ -252,7 +284,7 @@ function renderMasterDashboard() {
 
   // Top Cerimoniais
   const cerimonialMap = {};
-  allData.forEach((r) => {
+  allData.forEach(r => {
     if (r.cerimonial) {
       cerimonialMap[r.cerimonial] = (cerimonialMap[r.cerimonial] || 0) + 1;
     }
