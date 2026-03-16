@@ -1,7 +1,4 @@
-// ===== CONFIGURAÇÕES EMAILJS =====
-const EMAILJS_PUBLIC_KEY = "IN4Q24MwID8vgdvUw";
-const EMAILJS_SERVICE_ID = "service_xv1618p";
-const EMAILJS_TEMPLATE_ID = "template_maxime_cadastro";
+
 
 // ===== CONFIGURAÇÕES BÁSICAS =====
 const MASTER_PASSWORD = "master123";
@@ -10,12 +7,6 @@ const API_URL =
   "https://script.google.com/macros/s/AKfycbzU7zue4EAQHqmNAs6bNU_dzJn-qJy4tj7Y0z5GvapV_aGsIGtC3Aqgxo3Y87lb4Nuvsw/exec";
 const UPDATE_STATUS_URL =
   "https://script.google.com/macros/s/AKfycbzU7zue4EAQHqmNAs6bNU_dzJn-qJy4tj7Y0z5GvapV_aGsIGtC3Aqgxo3Y87lb4Nuvsw/exec";
-
-// ===== INICIALIZAR EMAILJS =====
-emailjs.init(EMAILJS_PUBLIC_KEY);
-
-let currentRole = null;
-let allData = [];
 
 // ===== LOGIN =====
 async function handleLogin() {
@@ -200,31 +191,6 @@ async function updateStatus(nome, novoStatus) {
   }
 }
 
-// ===== ENVIAR EMAIL COM EMAILJS =====
-async function enviarEmailComEmailJS(email, nome, observacao) {
-  try {
-    console.log("📧 Enviando email para:", email);
-
-    const templateParams = {
-      to_email: email,
-      nome: nome,
-      observacao: observacao || "Sem observações",
-      data_envio: new Date().toLocaleDateString("pt-BR"),
-    };
-
-    const response = await emailjs.send(
-      EMAILJS_SERVICE_ID,
-      EMAILJS_TEMPLATE_ID,
-      templateParams,
-    );
-
-    console.log("✅ Email enviado com sucesso!", response);
-    return true;
-  } catch (error) {
-    console.error("❌ Erro ao enviar email:", error);
-    return false;
-  }
-}
 
 // ===== RENDER MASTER DASHBOARD =====
 function renderMasterDashboard() {
