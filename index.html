@@ -32,12 +32,10 @@
           <option value="master">Master</option>
         </select>
       </label>
-
       <label>
         Senha:
         <input type="password" id="password" />
       </label>
-
       <button id="login-btn">Entrar</button>
       <p id="login-error" class="error"></p>
     </div>
@@ -49,16 +47,20 @@
         <button id="logout-btn">Sair</button>
       </div>
 
-      <!-- Área do master (dashboard) - Renderizado dinamicamente - TOPO -->
+      <!-- Área do master (dashboard) - TOPO -->
       <div id="master-dashboard" style="display:none;"></div>
 
       <h2>Consulta de Orçamentos</h2>
-
-      <label>
-        Nome do noivo:
-        <input type="text" id="search-name" placeholder="Digite o nome do noivo" />
-      </label>
-      <button id="search-btn">Buscar</button>
+      <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: center;">
+        <div style="flex: 1;">
+          <label>
+            Nome do noivo:
+            <input type="text" id="search-name" placeholder="Digite o nome do noivo" />
+          </label>
+        </div>
+        <button id="search-btn">Buscar</button>
+        <button id="salvar-status-btn" style="display: none; background-color: #FF9800; font-weight: bold; padding: 12px 20px;">💾 Salvar Alterações</button>
+      </div>
 
       <table id="results-table">
         <thead>
@@ -73,7 +75,8 @@
             <th>Status</th>
           </tr>
         </thead>
-        <tbody></tbody>
+        <tbody>
+        </tbody>
       </table>
     </div>
   </div>
@@ -94,6 +97,7 @@
     </div>
   </div>
 
+  <!-- App Script -->
   <script src="app.js"></script>
 </body>
 </html>
