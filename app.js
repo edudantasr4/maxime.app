@@ -192,7 +192,7 @@ function renderTable(data) {
     if (currentRole === "consultor") {
       // Dropdown com cores inline
       statusCell = `
-        <select id="status-${row.nome.replace(/\s/g, '-')}" class="status-select" style="
+        <select id="status-${row.nome.replace(/\s/g, '-')}" class="status-select" onchange="registrarMudanca('${row.nome}', this.value)" style="
           padding: 8px 12px;
           border-radius: 5px;
           border: 2px solid #ddd;
@@ -265,6 +265,13 @@ function openObservacaoModal(nome, observacao) {
 
 function closeObservacaoModal() {
   document.getElementById("observacao-modal").style.display = "none";
+}
+
+// ===== REGISTRAR MUDANÇA DE STATUS =====
+function registrarMudanca(nome, novoStatus) {
+  statusAlterados[nome] = novoStatus;
+  console.log(`📝 Mudança registrada: ${nome} → ${novoStatus}`);
+  console.log(`Total de mudanças: ${Object.keys(statusAlterados).length}`);
 }
 
 // ===== SALVAR ALTERAÇÕES =====
