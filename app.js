@@ -10,6 +10,7 @@ const UPDATE_STATUS_URL = WORKER_URL;
 let currentRole = null;
 let allData = [];
 let statusAlterados = {}; // Armazenar alterações pendentes
+let buscaAtiva = false; // Flag para saber se há busca ativa
 
 console.log("✅ App Maxime inicializado – Conectado à API real");
 
@@ -79,7 +80,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
 // ===== VERIFICAR ATUALIZAÇÕES A CADA 3 SEGUNDOS (PARA MASTER) =====
 setInterval(async () => {
-  if (currentRole === "master" && document.getElementById("consulta-view").style.display !== "none") {
+  if (currentRole === "master" && document.getElementById("consulta-view").style.display !== "none" && !buscaAtiva) {
     await fetchDataFromAPI();
   }
 }, 3000);
@@ -157,10 +158,12 @@ function handleLogout() {
 function handleSearch() {
   const searchTerm = document.getElementById("search-name").value.toLowerCase();
   if (searchTerm === "") {
+    buscaAtiva = false;
     renderResults();
     return;
   }
 
+  buscaAtiva = true;
   const filtered = allData.filter(row =>
     row.nome.toLowerCase().includes(searchTerm)
   );
@@ -169,6 +172,7 @@ function handleSearch() {
 
 // ===== RENDER RESULTS =====
 function renderResults() {
+  buscaAtiva = false;
   renderTable(allData);
 }
 
