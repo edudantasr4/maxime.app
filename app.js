@@ -9,8 +9,73 @@ const UPDATE_STATUS_URL = WORKER_URL;
 
 let currentRole = null;
 let allData = [];
+let statusAlterados = {}; // Armazenar alterações pendentes
 
 console.log("✅ App Maxime inicializado – Conectado à API real");
+
+// ===== VERIFICAR SESSÃO AO CARREGAR =====
+document.addEventListener("DOMContentLoaded", function() {
+  const sessao = localStorage.getItem("maxime_sessao");
+  if (sessao) {
+    const dados = JSON.parse(sessao);
+    currentRole = dados.role;
+    
+    if (currentRole) {
+      document.getElementById("login-view").style.display = "none";
+      document.getElementById("consulta-view").style.display = "block";
+      
+      const dashboard = document.getElementById("master-dashboard");
+      if (currentRole === "master") {
+        dashboard.style.display = "block";
+        document.getElementById("user-role").textContent = "Logado como MASTER";
+      } else {
+        dashboard.style.display = "none";
+        document.getElementById("user-role").textContent = "Logado como CONSULTOR";
+      }
+      
+      fetchDataFromAPI();
+    }
+  }
+
+  // Event listeners
+  const loginBtn = document.getElementById("login-btn");
+  const logoutBtn = document.getElementById("logout-btn");
+  const searchBtn = document.getElementById("search-btn");
+  const salvarBtn = document.getElementById("salvar-status-btn");
+  const searchInput = document.getElementById("search-name");
+  const passwordInput = document.getElementById("password");
+
+  if (loginBtn) loginBtn.onclick = handleLogin;
+  if (logoutBtn) logoutBtn.onclick = handleLogout;
+  if (searchBtn) searchBtn.onclick = handleSearch;
+  if (salvarBtn) salvarBtn.onclick = salvarAlteracoes;
+
+  if (searchInput) {
+    searchInput.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") handleSearch();
+    });
+  }
+
+  if (passwordInput) {
+    passwordInput.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") handleLogin();
+    });
+  }
+
+  // Modal
+  const modal = document.getElementById("observacao-modal");
+  const closeBtn = document.getElementById("close-modal-btn");
+  const closeBtnFooter = document.getElementById("close-modal-btn-footer");
+
+  if (closeBtn) closeBtn.onclick = closeObservacaoModal;
+  if (closeBtnFooter) closeBtnFooter.onclick = closeObservacaoModal;
+
+  window.onclick = function(event) {
+    if (event.target === modal) {
+      modal.style.display = "none";
+    }
+  };
+});
 
 // ===== VERIFICAR ATUALIZAÇÕES A CADA 3 SEGUNDOS (PARA MASTER) =====
 setInterval(async () => {
@@ -38,6 +103,10 @@ async function handleLogin() {
   }
 
   currentRole = role;
+  
+  // Salvar sessão
+  localStorage.setItem("maxime_sessao", JSON.stringify({ role: role }));
+  
   document.getElementById("login-view").style.display = "none";
   document.getElementById("consulta-view").style.display = "block";
 
@@ -73,6 +142,7 @@ async function fetchDataFromAPI() {
 // ===== LOGOUT =====
 function handleLogout() {
   currentRole = null;
+  localStorage.removeItem("maxime_sessao");
   document.getElementById("login-view").style.display = "block";
   document.getElementById("consulta-view").style.display = "none";
   document.getElementById("role").value = "consultor";
@@ -80,6 +150,7 @@ function handleLogout() {
   document.getElementById("login-error").textContent = "";
   document.getElementById("search-name").value = "";
   allData = [];
+  statusAlterados = {};
 }
 
 // ===== BUSCA =====
@@ -107,7 +178,7 @@ function renderTable(data) {
   tbody.innerHTML = "";
 
   if (data.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px;">Nenhum resultado encontrado</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 20px;">Nenhum resultado encontrado</td></tr>`;
     return;
   }
 
@@ -116,20 +187,23 @@ function renderTable(data) {
 
     // Status dropdown para Consultor, cores para Master
     let statusCell = "";
+    let statusAtual = statusAlterados[row.nome] || row.status || "AGUARDANDO";
+    
     if (currentRole === "consultor") {
-      // Dropdown com cores
+      // Dropdown com cores inline
       statusCell = `
-        <select onchange="updateStatus('${row.nome}', this.value)" class="status-select" style="
+        <select id="status-${row.nome.replace(/\s/g, '-')}" class="status-select" style="
           padding: 8px 12px;
           border-radius: 5px;
-          border: none;
+          border: 2px solid #ddd;
           font-weight: bold;
           cursor: pointer;
           font-size: 13px;
+          width: 120px;
         ">
-          <option value="AGUARDANDO" ${row.status === "AGUARDANDO" ? "selected" : ""} style="background-color: #FFC107; color: black;">AGUARDANDO</option>
-          <option value="SIM" ${row.status === "SIM" ? "selected" : ""} style="background-color: #4CAF50; color: white;">SIM</option>
-          <option value="NÃO" ${row.status === "NÃO" ? "selected" : ""} style="background-color: #F44336; color: white;">NÃO</option>
+          <option value="AGUARDANDO" ${statusAtual === "AGUARDANDO" ? "selected" : ""}>AGUARDANDO</option>
+          <option value="SIM" ${statusAtual === "SIM" ? "selected" : ""}>SIM</option>
+          <option value="NÃO" ${statusAtual === "NÃO" ? "selected" : ""}>NÃO</option>
         </select>
       `;
     } else {
@@ -137,15 +211,15 @@ function renderTable(data) {
       let statusColor = "#FFC107";
       let statusText = "AGUARDANDO";
       
-      if (row.status === "SIM") {
+      if (statusAtual === "SIM") {
         statusColor = "#4CAF50";
         statusText = "SIM";
-      } else if (row.status === "NÃO") {
+      } else if (statusAtual === "NÃO") {
         statusColor = "#F44336";
         statusText = "NÃO";
       }
       
-      statusCell = `<span style="background-color: ${statusColor}; color: white; padding: 8px 12px; border-radius: 5px; font-size: 13px; font-weight: bold; display: inline-block; min-width: 100px; text-align: center;">${statusText}</span>`;
+      statusCell = `<span style="background-color: ${statusColor} !important; color: white; padding: 8px 12px; border-radius: 5px; font-size: 13px; font-weight: bold; display: inline-block; min-width: 100px; text-align: center;">${statusText}</span>`;
     }
 
     // Observações clicável
@@ -170,6 +244,16 @@ function renderTable(data) {
 
     tbody.appendChild(tr);
   });
+
+  // Mostrar botão salvar se for consultor
+  const salvarBtn = document.getElementById("salvar-status-btn");
+  if (salvarBtn) {
+    if (currentRole === "consultor") {
+      salvarBtn.style.display = "inline-block";
+    } else {
+      salvarBtn.style.display = "none";
+    }
+  }
 }
 
 // ===== MODAL OBSERVAÇÕES =====
@@ -183,70 +267,39 @@ function closeObservacaoModal() {
   document.getElementById("observacao-modal").style.display = "none";
 }
 
-// Fechar modal ao clicar no X
-document.addEventListener("DOMContentLoaded", function() {
-  const modal = document.getElementById("observacao-modal");
-  const closeBtn = document.getElementById("close-modal-btn");
-  const closeBtnFooter = document.getElementById("close-modal-btn-footer");
-
-  if (closeBtn) {
-    closeBtn.onclick = closeObservacaoModal;
-  }
-  if (closeBtnFooter) {
-    closeBtnFooter.onclick = closeObservacaoModal;
-  }
-
-  window.onclick = function(event) {
-    if (event.target === modal) {
-      modal.style.display = "none";
-    }
-  };
-
-  // Event listeners dos botões
-  const loginBtn = document.getElementById("login-btn");
-  const logoutBtn = document.getElementById("logout-btn");
-  const searchBtn = document.getElementById("search-btn");
-  const searchInput = document.getElementById("search-name");
-  const passwordInput = document.getElementById("password");
-
-  if (loginBtn) loginBtn.onclick = handleLogin;
-  if (logoutBtn) logoutBtn.onclick = handleLogout;
-  if (searchBtn) searchBtn.onclick = handleSearch;
-
-  if (searchInput) {
-    searchInput.addEventListener("keypress", function(e) {
-      if (e.key === "Enter") handleSearch();
-    });
-  }
-
-  if (passwordInput) {
-    passwordInput.addEventListener("keypress", function(e) {
-      if (e.key === "Enter") handleLogin();
-    });
-  }
-});
-
-// ===== UPDATE STATUS =====
-async function updateStatus(nome, novoStatus) {
+// ===== SALVAR ALTERAÇÕES =====
+async function salvarAlteracoes() {
   try {
-    const response = await fetch(UPDATE_STATUS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "updateStatus",
-        nome: nome,
-        status: novoStatus
-      })
-    });
-
-    const result = await response.text();
-    console.log("Status atualizado:", result);
+    let alteracoesEnviadas = 0;
     
-    // Atualizar dados imediatamente
+    for (const nome in statusAlterados) {
+      const novoStatus = statusAlterados[nome];
+      const select = document.getElementById(`status-${nome.replace(/\s/g, '-')}`);
+      const statusSelecionado = select ? select.value : novoStatus;
+
+      const response = await fetch(UPDATE_STATUS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "updateStatus",
+          nome: nome,
+          status: statusSelecionado
+        })
+      });
+
+      if (response.ok) {
+        alteracoesEnviadas++;
+      }
+    }
+
+    statusAlterados = {};
+    alert(`✅ ${alteracoesEnviadas} alteração(ões) salva(s) com sucesso!`);
+    
+    // Atualizar dados
     await fetchDataFromAPI();
   } catch (error) {
-    console.error("Erro ao atualizar status:", error);
-    alert("Erro ao atualizar status!");
+    console.error("Erro ao salvar:", error);
+    alert("❌ Erro ao salvar alterações!");
   }
 }
 
