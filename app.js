@@ -12,6 +12,13 @@ let allData = [];
 
 console.log("✅ App Maxime inicializado – Conectado à API real");
 
+// ===== VERIFICAR ATUALIZAÇÕES A CADA 3 SEGUNDOS (PARA MASTER) =====
+setInterval(async () => {
+  if (currentRole === "master" && document.getElementById("consulta-view").style.display !== "none") {
+    await fetchDataFromAPI();
+  }
+}, 3000);
+
 // ===== LOGIN =====
 async function handleLogin() {
   const role = document.getElementById("role").value;
@@ -60,7 +67,6 @@ async function fetchDataFromAPI() {
     }
   } catch (error) {
     console.error("Erro ao buscar dados:", error);
-    alert("Erro ao carregar dados!");
   }
 }
 
@@ -108,20 +114,38 @@ function renderTable(data) {
   data.forEach(row => {
     const tr = document.createElement("tr");
 
-    // Status dropdown para Consultor, texto para Master
+    // Status dropdown para Consultor, cores para Master
     let statusCell = "";
     if (currentRole === "consultor") {
+      // Dropdown com cores
       statusCell = `
-        <select onchange="updateStatus('${row.nome}', this.value)" class="status-select">
-          <option value="AGUARDANDO" ${row.status === "AGUARDANDO" ? "selected" : ""}>AGUARDANDO</option>
-          <option value="SIM" ${row.status === "SIM" ? "selected" : ""}>SIM</option>
-          <option value="NÃO" ${row.status === "NÃO" ? "selected" : ""}>NÃO</option>
+        <select onchange="updateStatus('${row.nome}', this.value)" class="status-select" style="
+          padding: 8px 12px;
+          border-radius: 5px;
+          border: none;
+          font-weight: bold;
+          cursor: pointer;
+          font-size: 13px;
+        ">
+          <option value="AGUARDANDO" ${row.status === "AGUARDANDO" ? "selected" : ""} style="background-color: #FFC107; color: black;">AGUARDANDO</option>
+          <option value="SIM" ${row.status === "SIM" ? "selected" : ""} style="background-color: #4CAF50; color: white;">SIM</option>
+          <option value="NÃO" ${row.status === "NÃO" ? "selected" : ""} style="background-color: #F44336; color: white;">NÃO</option>
         </select>
       `;
     } else {
-      const statusColor = row.status === "SIM" ? "#4CAF50" : row.status === "NÃO" ? "#F44336" : "#FFC107";
-      const statusText = row.status || "SEM STATUS";
-      statusCell = `<span style="background-color: ${statusColor}; color: white; padding: 5px 10px; border-radius: 3px; font-size: 12px;">${statusText}</span>`;
+      // Master vê apenas cores
+      let statusColor = "#FFC107";
+      let statusText = "AGUARDANDO";
+      
+      if (row.status === "SIM") {
+        statusColor = "#4CAF50";
+        statusText = "SIM";
+      } else if (row.status === "NÃO") {
+        statusColor = "#F44336";
+        statusText = "NÃO";
+      }
+      
+      statusCell = `<span style="background-color: ${statusColor}; color: white; padding: 8px 12px; border-radius: 5px; font-size: 13px; font-weight: bold; display: inline-block; min-width: 100px; text-align: center;">${statusText}</span>`;
     }
 
     // Observações clicável
@@ -217,6 +241,8 @@ async function updateStatus(nome, novoStatus) {
 
     const result = await response.text();
     console.log("Status atualizado:", result);
+    
+    // Atualizar dados imediatamente
     await fetchDataFromAPI();
   } catch (error) {
     console.error("Erro ao atualizar status:", error);
@@ -301,19 +327,19 @@ function renderMasterDashboard() {
       </div>
       <div style="border-left: 4px solid #4CAF50; padding: 15px; background: #f5f5f5; border-radius: 5px;">
         <div style="font-size: 12px; color: #666;">Fecharam Aluguel</div>
-        <div style="font-size: 24px; font-weight: bold;">${fecharam}</div>
+        <div style="font-size: 24px; font-weight: bold; color: #4CAF50;">${fecharam}</div>
       </div>
       <div style="border-left: 4px solid #F44336; padding: 15px; background: #f5f5f5; border-radius: 5px;">
         <div style="font-size: 12px; color: #666;">Não Fecharam</div>
-        <div style="font-size: 24px; font-weight: bold;">${naoFecharam}</div>
+        <div style="font-size: 24px; font-weight: bold; color: #F44336;">${naoFecharam}</div>
       </div>
       <div style="border-left: 4px solid #FFC107; padding: 15px; background: #f5f5f5; border-radius: 5px;">
         <div style="font-size: 12px; color: #666;">Aguardando</div>
-        <div style="font-size: 24px; font-weight: bold;">${aguardando}</div>
+        <div style="font-size: 24px; font-weight: bold; color: #FFC107;">${aguardando}</div>
       </div>
       <div style="border-left: 4px solid #2196F3; padding: 15px; background: #f5f5f5; border-radius: 5px;">
         <div style="font-size: 12px; color: #666;">Taxa de Conversão</div>
-        <div style="font-size: 24px; font-weight: bold;">${taxa}%</div>
+        <div style="font-size: 24px; font-weight: bold; color: #2196F3;">${taxa}%</div>
       </div>
     </div>
 
@@ -322,15 +348,15 @@ function renderMasterDashboard() {
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
         <div style="padding: 15px; background: #e8f5e9; border-radius: 5px;">
           <div style="font-size: 12px;">Esta Semana</div>
-          <div style="font-size: 20px; font-weight: bold;">${estaSemana}</div>
+          <div style="font-size: 20px; font-weight: bold; color: #4CAF50;">${estaSemana}</div>
         </div>
         <div style="padding: 15px; background: #e8f5e9; border-radius: 5px;">
           <div style="font-size: 12px;">Este Mês</div>
-          <div style="font-size: 20px; font-weight: bold;">${esteMes}</div>
+          <div style="font-size: 20px; font-weight: bold; color: #4CAF50;">${esteMes}</div>
         </div>
         <div style="padding: 15px; background: #e8f5e9; border-radius: 5px;">
           <div style="font-size: 12px;">Últimos 30 dias</div>
-          <div style="font-size: 20px; font-weight: bold;">${ultimos30}</div>
+          <div style="font-size: 20px; font-weight: bold; color: #4CAF50;">${ultimos30}</div>
         </div>
       </div>
     </div>
@@ -339,19 +365,19 @@ function renderMasterDashboard() {
       <div>
         <h4>Top Consultores</h4>
         <ul style="list-style: none; padding: 0;">
-          ${topConsultores.length > 0 ? topConsultores.map(([consultor, count]) => `<li>${consultor}: ${count}</li>`).join("") : "<li>Sem dados</li>"}
+          ${topConsultores.length > 0 ? topConsultores.map(([consultor, count]) => `<li style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>${consultor}</strong>: ${count}</li>`).join("") : "<li>Sem dados</li>"}
         </ul>
       </div>
       <div>
         <h4>Top Fotógrafos</h4>
         <ul style="list-style: none; padding: 0;">
-          ${topFotografos.length > 0 ? topFotografos.map(([fotografo, count]) => `<li>${fotografo}: ${count}</li>`).join("") : "<li>Sem dados</li>"}
+          ${topFotografos.length > 0 ? topFotografos.map(([fotografo, count]) => `<li style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>${fotografo}</strong>: ${count}</li>`).join("") : "<li>Sem dados</li>"}
         </ul>
       </div>
       <div>
         <h4>Top Cerimoniais</h4>
         <ul style="list-style: none; padding: 0;">
-          ${topCerimoniais.length > 0 ? topCerimoniais.map(([cerimonial, count]) => `<li>${cerimonial}: ${count}</li>`).join("") : "<li>Sem dados</li>"}
+          ${topCerimoniais.length > 0 ? topCerimoniais.map(([cerimonial, count]) => `<li style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>${cerimonial}</strong>: ${count}</li>`).join("") : "<li>Sem dados</li>"}
         </ul>
       </div>
     </div>
